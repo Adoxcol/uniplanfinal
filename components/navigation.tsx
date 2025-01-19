@@ -7,20 +7,47 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { GraduationCap } from 'lucide-react';
 import { ModeToggle } from './mode-toggle';
-
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { useEffect, useState } from 'react';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
 const navigation = [
   { name: 'Home', href: '/' },
   { name: 'Degree Planner', href: '/plans' },
   { name: 'Templates', href: '/templates' },
   { name: 'Blog', href: '/blog' },
-  
   { name: 'Forums', href: '/forums' },
-
 ];
 
 export function Navigation() {
   const pathname = usePathname();
+  const supabase = createClientComponentClient();
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        setUser(session.user);
+      }
+    };
+
+    fetchUser();
+
+    // Set up auth state change listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session) {
+        setUser(session.user);
+      } else {
+        setUser(null);
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [supabase]);
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -32,6 +59,7 @@ export function Navigation() {
             <span className="font-bold text-lg">UniPlan</span>
           </Link>
         </div>
+
         {/* Navigation Links */}
         <nav className="flex items-center space-x-6 text-sm font-medium">
           {navigation.map((item) => (
@@ -47,14 +75,41 @@ export function Navigation() {
             </Link>
           ))}
         </nav>
+
         {/* Right Section */}
         <div className="ml-auto flex items-center space-x-4">
           <ModeToggle />
-          <Button asChild variant="default" size="sm">
-            <Link href="/login">Sign In</Link>
-          </Button>
+          {user ? (
+            <ProfileDropdown user={user} supabase={supabase} />
+          ) : (
+            <Button 
+              variant="default" 
+              size="sm" 
+              onClick={() => window.location.href = '/login'}
+            >
+              Sign In
+            </Button>
+          )}
         </div>
       </div>
     </header>
+  );
+}
+
+function ProfileDropdown({ user, supabase }) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Avatar className="cursor-pointer">
+          <AvatarImage src={user?.user_metadata?.avatar_url || '/default-avatar.jpg'} alt="User Avatar" />
+          <AvatarFallback>{user?.email?.charAt(0)?.toUpperCase()}</AvatarFallback>
+        </Avatar>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem onClick={() => (window.location.href = '/profile')}>Profile</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => (window.location.href = '/settings')}>Settings</DropdownMenuItem>
+        <DropdownMenuItem onClick={async () => await supabase.auth.signOut()}>Sign Out</DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
