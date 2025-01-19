@@ -78,7 +78,7 @@ export function AddCourseDialog({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-  
+
     if (!courseData.code || !courseData.name) {
       toast({
         title: "Error",
@@ -87,19 +87,20 @@ export function AddCourseDialog({
       });
       return;
     }
-  
+
     try {
       if (courseToEdit) {
         const { error } = await supabase
           .from("courses")
           .update({
             ...courseData,
-            updated_at: new Date().toISOString()
+            degree_plan_id: degreePlanId, // Ensure degree_plan_id is included
+            updated_at: new Date().toISOString(),
           })
           .eq("id", courseToEdit.id);
-  
+
         if (error) throw error;
-  
+
         onCourseEdit(courseData);
         toast({
           title: "Success",
@@ -109,8 +110,9 @@ export function AddCourseDialog({
         const newCourse = {
           ...courseData,
           id: generateUUID(),
+          degree_plan_id: degreePlanId, // Ensure degree_plan_id is included
           created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
         };
 
         const { data, error } = await supabase
@@ -118,16 +120,17 @@ export function AddCourseDialog({
           .insert([newCourse])
           .select()
           .single();
-  
+
         if (error) throw error;
-  
+
         onCourseAdd(data);
         toast({
           title: "Success",
           description: "Course added successfully",
         });
       }
-  
+
+      // Reset the form after submission
       setCourseData({
         id: generateUUID(),
         degree_plan_id: degreePlanId,
@@ -142,7 +145,8 @@ export function AddCourseDialog({
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       });
-  
+
+      // Close the dialog
       onOpenChange(false);
     } catch (error) {
       console.error("Error saving course:", error);
@@ -153,7 +157,7 @@ export function AddCourseDialog({
       });
     }
   };
-  
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px]">

@@ -5,15 +5,10 @@ import { DegreePlanHeader } from "@/components/degree-plan/DegreePlanHeader";
 import { SemesterGrid } from "@/components/degree-plan/SemesterGrid";
 import { NotesPanel } from "@/components/degree-plan/NotesPanel";
 import { DegreeStats } from "@/components/degree-plan/degree-stats";
-
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { Course } from "@/types/types";
-
 import { supabase } from '@/lib/supbaseClient';
 import { AddCourseDialog } from './add-course-dialog';
-
-
-
 
 interface PlannerContentProps {
   initialDegreePlan: any;
@@ -27,8 +22,10 @@ export function PlannerContent({ initialDegreePlan, initialCourses }: PlannerCon
   const [notes, setNotes] = useState<string[]>(initialDegreePlan.notes ? JSON.parse(initialDegreePlan.notes) : []);
   const [newNote, setNewNote] = useState("");
   const [courses, setCourses] = useState<Course[]>(initialCourses);
-  const [semesters, setSemesters] = useState<number[]>(initialDegreePlan.semesters || [1, 2, 3, 4]);
-  const [isPublic, setIsPublic] = useState(initialDegreePlan.is_public || false); // State for public/private option
+  const [semesters, setSemesters] = useState<number[]>(
+    initialDegreePlan.semesters || [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+  );
+  const [isPublic, setIsPublic] = useState(initialDegreePlan.is_public || false);
 
   useEffect(() => {
     // Optionally, perform any actions when the component mounts or updates
@@ -63,15 +60,20 @@ export function PlannerContent({ initialDegreePlan, initialCourses }: PlannerCon
   };
 
   const handleAddSemester = () => {
-    setSemesters(prevSemesters => {
-      const nextSemester = prevSemesters.length + 1;
-      return [...prevSemesters, nextSemester]; // Add the next semester number
-    });
+    if (semesters.length < 15) { // Limit to 8 semesters
+      setSemesters(prevSemesters => {
+        const nextSemester = prevSemesters.length > 0 ? Math.max(...prevSemesters) + 1 : 1;
+        return [...prevSemesters, nextSemester]; // Add the next semester number
+      });
+    } else {
+      alert("Maximum number of semesters reached (8).");
+    }
   };
 
   const handleSaveDegreePlan = async () => {
     try {
-      const { data, error } = await supabase
+      // Save the degree plan
+      const { data: degreePlan, error: degreePlanError } = await supabase
         .from("degree_plans")
         .upsert([
           {
@@ -82,14 +84,30 @@ export function PlannerContent({ initialDegreePlan, initialCourses }: PlannerCon
             notes: JSON.stringify(notes), // Store notes as a JSON string
             semesters,
           },
-        ]);
-
-      if (error) {
-        throw new Error(error.message);
+        ])
+        .select()
+        .single();
+  
+      if (degreePlanError) {
+        throw new Error(degreePlanError.message);
       }
-
-      alert("Degree plan saved successfully!");
-      console.log("Saved Degree Plan:", data);
+  
+      // Save courses in the `courses` table
+      const { error: coursesError } = await supabase
+        .from("courses")
+        .upsert(
+          courses.map((course) => ({
+            ...course,
+            degree_plan_id: degreePlan.id, // Link courses to the degree plan
+          }))
+        );
+  
+      if (coursesError) {
+        throw new Error(coursesError.message);
+      }
+  
+      alert("Degree plan and courses saved successfully!");
+      console.log("Saved Degree Plan:", degreePlan);
     } catch (error) {
       alert("Error saving degree plan: " + error.message);
       console.error(error);
@@ -114,18 +132,18 @@ export function PlannerContent({ initialDegreePlan, initialCourses }: PlannerCon
       </div>
 
       <div className="flex items-center gap-4 mb-4">
-  <label className="flex items-center cursor-pointer">
-    <input
-      type="checkbox"
-      checked={isPublic}
-      onChange={() => setIsPublic(!isPublic)} // Toggle public/private state
-      className="mr-2"
-    />
-    <span className="text-sm font-medium text-gray-700">
-      Make Plan Public
-    </span>
-  </label>
-</div>
+        <label className="flex items-center cursor-pointer">
+          <input
+            type="checkbox"
+            checked={isPublic}
+            onChange={() => setIsPublic(!isPublic)} // Toggle public/private state
+            className="mr-2"
+          />
+          <span className="text-sm font-medium text-gray-700">
+            Make Plan Public
+          </span>
+        </label>
+      </div>
 
       <ResizablePanelGroup direction="horizontal" className="min-h-[800px] rounded-lg border">
         <ResizablePanel defaultSize={75}>
@@ -167,11 +185,10 @@ export function PlannerContent({ initialDegreePlan, initialCourses }: PlannerCon
         open={isDialogOpen}
         onOpenChange={setIsDialogOpen}
         semester={selectedSemester}
+        degreePlanId={initialDegreePlan.id} // Pass degreePlanId to link courses
         courseToEdit={courseToEdit}
         onCourseAdd={handleCourseAdd}
         onCourseEdit={handleCourseEdit}
-        semesters={semesters}
-        onSemesterAdd={handleAddSemester}
       />
     </div>
   );
