@@ -1,29 +1,56 @@
 "use client";
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 
-export default function ProfileForm({ profile }: { profile: any }) {
-  const [fullName, setFullName] = useState(profile.full_name || "");
-  const [bio, setBio] = useState(profile.bio || "");
-  const [education, setEducation] = useState(profile.education || "");
-  const [skills, setSkills] = useState(
-    Array.isArray(profile.skills) ? profile.skills.join(", ") : ""
-  );
+interface ProfileFormProps {
+  fullName: string;
+  setFullName: (value: string) => void;
+  email: string;
+  bio: string;
+  setBio: (value: string) => void;
+  education: string;
+  setEducation: (value: string) => void;
+  isUsernameEditable: boolean;
+  username: string;
+  setUsername: (value: string) => void;
+}
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    // Add your form submission logic here
-  };
-
+export default function ProfileForm({
+  fullName,
+  setFullName,
+  email,
+  bio,
+  setBio,
+  education,
+  setEducation,
+  isUsernameEditable,
+  username,
+  setUsername,
+}: ProfileFormProps) {
   return (
-    <form onSubmit={handleSubmit}>
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
       <div className="space-y-2">
-        <Label htmlFor="fullName">Full Name</Label>
+        <Label htmlFor="username">Username</Label>
         <Input
-          id="fullName"
+          id="username"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          disabled={!isUsernameEditable}
+          required
+        />
+        {!isUsernameEditable && (
+          <p className="text-sm text-muted-foreground dark:text-gray-400">
+            Username cannot be changed after initial setup.
+          </p>
+        )}
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="full-name">Full Name</Label>
+        <Input
+          id="full-name"
+          placeholder="Jane Doe"
           value={fullName}
           onChange={(e) => setFullName(e.target.value)}
           required
@@ -31,12 +58,18 @@ export default function ProfileForm({ profile }: { profile: any }) {
       </div>
 
       <div className="space-y-2">
+        <Label htmlFor="email">Email</Label>
+        <Input id="email" type="email" value={email} disabled />
+      </div>
+
+      <div className="space-y-2">
         <Label htmlFor="bio">About Me</Label>
         <Textarea
           id="bio"
+          placeholder="Tell us about yourself"
+          rows={4}
           value={bio}
           onChange={(e) => setBio(e.target.value)}
-          rows={4}
         />
       </div>
 
@@ -44,22 +77,12 @@ export default function ProfileForm({ profile }: { profile: any }) {
         <Label htmlFor="education">Education</Label>
         <Textarea
           id="education"
+          placeholder="Your educational background"
+          rows={3}
           value={education}
           onChange={(e) => setEducation(e.target.value)}
-          rows={3}
         />
       </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="skills">Skills (comma-separated)</Label>
-        <Input
-          id="skills"
-          value={skills}
-          onChange={(e) => setSkills(e.target.value)}
-        />
-      </div>
-
-      <Button type="submit">Save Changes</Button>
-    </form>
+    </div>
   );
 }
