@@ -1,53 +1,68 @@
 'use client';
 
-import * as React from 'react';
-import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
+import Link from 'next/link';
 import { GraduationCap } from 'lucide-react';
-import { ModeToggle } from './mode-toggle';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
+import { Button } from '@/components/ui/button';
+import { ModeToggle } from '@/components/mode-toggle';
+import { cn } from '@/lib/utils';
 import { useEffect, useState } from 'react';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { createBrowserClient } from '@supabase/ssr';
+import { User } from '@supabase/supabase-js';
 
 const navigation = [
   { name: 'Home', href: '/' },
-  { name: 'Degree Planner', href: '/plans' },
+  { name: 'Degree Plan', href: '/plans' },
+  { name: 'Blogs', href: '/blog' },
   { name: 'Templates', href: '/templates' },
-  { name: 'Blog', href: '/blog' },
   { name: 'Forums', href: '/forums' },
 ];
 
 export function Navigation() {
   const pathname = usePathname();
-  const supabase = createClientComponentClient();
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
 
+  // Fetch the current user session (only if signed in)
   useEffect(() => {
-    const fetchUser = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        setUser(session.user);
+    const fetchSession = async () => {
+      try {
+        const { data: { user }, error } = await supabase.auth.getUser();
+        if (error) {
+          // If no session exists, set user to null
+          setUser(null);
+        } else {
+          setUser(user);
+        }
+      } catch (error) {
+        console.error('Error fetching session:', error);
+        setUser(null); // Fallback to no user
+      } finally {
+        setLoading(false);
       }
     };
 
-    fetchUser();
+    fetchSession();
 
-    // Set up auth state change listener
+    // Listen for auth state changes (e.g., sign-in, sign-out)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (session) {
-        setUser(session.user);
-      } else {
-        setUser(null);
-      }
+      setUser(session?.user ?? null);
     });
 
     return () => {
-      subscription.unsubscribe();
+      subscription?.unsubscribe();
     };
   }, [supabase]);
+
+  if (loading) {
+    return <div>Loading...</div>; // Show loading until user state is determined
+  }
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -80,12 +95,12 @@ export function Navigation() {
         <div className="ml-auto flex items-center space-x-4">
           <ModeToggle />
           {user ? (
-            <ProfileDropdown user={user} supabase={supabase} />
+            <ProfileDropdown user={user} signOut={() => supabase.auth.signOut()} />
           ) : (
             <Button 
               variant="default" 
               size="sm" 
-              onClick={() => window.location.href = '/login'}
+              onClick={() => (window.location.href = '/login')}
             >
               Sign In
             </Button>
@@ -96,7 +111,7 @@ export function Navigation() {
   );
 }
 
-function ProfileDropdown({ user, supabase }) {
+function ProfileDropdown({ user, signOut }: { user: User | null; signOut: () => void }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -108,7 +123,7 @@ function ProfileDropdown({ user, supabase }) {
       <DropdownMenuContent align="end">
         <DropdownMenuItem onClick={() => (window.location.href = '/profile')}>Profile</DropdownMenuItem>
         <DropdownMenuItem onClick={() => (window.location.href = '/settings')}>Settings</DropdownMenuItem>
-        <DropdownMenuItem onClick={async () => await supabase.auth.signOut()}>Sign Out</DropdownMenuItem>
+        <DropdownMenuItem onClick={signOut}>Sign Out</DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );

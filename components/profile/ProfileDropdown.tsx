@@ -7,12 +7,15 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import { createBrowserClient } from "@supabase/ssr";
 import { useRouter } from "next/navigation";
 import { buttonVariants } from "@/components/ui/button";
 
 export function ProfileDropdown() {
-  const supabase = createClientComponentClient();
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
   const router = useRouter();
 
   const handleLogout = async () => {
