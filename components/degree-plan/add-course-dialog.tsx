@@ -1,5 +1,4 @@
-// app/components/AddCourseDialog.tsx
-"use client"; // Add this line
+"use client";
 
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -9,37 +8,39 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { toast } from "@/components/ui/use-toast";
 import { createClient } from "@/utils/supabase/client";
+import { Course } from "@/types/types";
+
+// Function to generate UUID v4
+function generateUUID() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
 
 interface AddCourseDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   semester: number | null;
-  onCourseAdd: (course: CourseData) => void;
-  onCourseEdit: (course: CourseData) => void;
-  courseToEdit: CourseData | null;
-}
-
-interface CourseData {
-  id?: string;
-  code: string;
-  name: string;
-  credits: number;
-  semester: number;
-  section?: string;
-  timing?: string;
-  difficulty?: number;
-  grade?: string;
+  degreePlanId: string;
+  onCourseAdd: (course: Course) => void;
+  onCourseEdit: (course: Course) => void;
+  courseToEdit: Course | null;
 }
 
 export function AddCourseDialog({
   open,
   onOpenChange,
   semester,
+  degreePlanId,
   onCourseAdd,
   onCourseEdit,
   courseToEdit,
 }: AddCourseDialogProps) {
-  const [courseData, setCourseData] = useState<CourseData>({
+  const [courseData, setCourseData] = useState<Course>({
+    id: generateUUID(),
+    degree_plan_id: degreePlanId,
     code: "",
     name: "",
     credits: 0,
@@ -48,6 +49,8 @@ export function AddCourseDialog({
     timing: "",
     difficulty: 1,
     grade: "",
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
   });
 
   const supabase = createClient();
@@ -57,6 +60,8 @@ export function AddCourseDialog({
       setCourseData(courseToEdit);
     } else {
       setCourseData({
+        id: generateUUID(),
+        degree_plan_id: degreePlanId,
         code: "",
         name: "",
         credits: 0,
@@ -65,13 +70,15 @@ export function AddCourseDialog({
         timing: "",
         difficulty: 1,
         grade: "",
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       });
     }
-  }, [courseToEdit, semester]);
+  }, [courseToEdit, semester, degreePlanId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
+  
     if (!courseData.code || !courseData.name) {
       toast({
         title: "Error",
@@ -80,38 +87,50 @@ export function AddCourseDialog({
       });
       return;
     }
-
+  
     try {
       if (courseToEdit) {
         const { error } = await supabase
           .from("courses")
-          .update(courseData)
-          .eq("id", courseData.id);
-
+          .update({
+            ...courseData,
+            updated_at: new Date().toISOString()
+          })
+          .eq("id", courseToEdit.id);
+  
         if (error) throw error;
-
+  
         onCourseEdit(courseData);
         toast({
           title: "Success",
           description: "Course updated successfully",
         });
       } else {
+        const newCourse = {
+          ...courseData,
+          id: generateUUID(),
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+
         const { data, error } = await supabase
           .from("courses")
-          .insert([courseData])
+          .insert([newCourse])
           .select()
           .single();
-
+  
         if (error) throw error;
-
+  
         onCourseAdd(data);
         toast({
           title: "Success",
           description: "Course added successfully",
         });
       }
-
+  
       setCourseData({
+        id: generateUUID(),
+        degree_plan_id: degreePlanId,
         code: "",
         name: "",
         credits: 0,
@@ -120,8 +139,10 @@ export function AddCourseDialog({
         timing: "",
         difficulty: 1,
         grade: "",
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       });
-
+  
       onOpenChange(false);
     } catch (error) {
       console.error("Error saving course:", error);
@@ -132,7 +153,7 @@ export function AddCourseDialog({
       });
     }
   };
-
+  
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
