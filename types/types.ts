@@ -64,3 +64,4 @@ export interface Profile {
   projects?: string; // Optional: Projects of the profile
   avatar_url?: string; // Optional: Avatar URL of the profile
 }
+
