@@ -1,8 +1,9 @@
 'use client';
 
 import { Card } from '@/components/ui/card';
-import { Course } from '@/types/course';
+
 import { Progress } from '../ui/progress';
+import { Course } from '@/types/types';
  // Define this type based on your schema
 
 interface DegreeStatsProps {

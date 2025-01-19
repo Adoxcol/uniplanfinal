@@ -1,11 +1,14 @@
-'use client';
+// app/components/AddCourseDialog.tsx
+"use client"; // Add this line
 
-import { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Button } from '@/components/ui/button';
-import { Slider } from '@/components/ui/slider';
+import { useState, useEffect } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { Slider } from "@/components/ui/slider";
+import { toast } from "@/components/ui/use-toast";
+import { createClient } from "@/utils/supabase/client";
 
 interface AddCourseDialogProps {
   open: boolean;
@@ -13,19 +16,19 @@ interface AddCourseDialogProps {
   semester: number | null;
   onCourseAdd: (course: CourseData) => void;
   onCourseEdit: (course: CourseData) => void;
-  courseToEdit: CourseData | null; // Prop to receive course data for editing
+  courseToEdit: CourseData | null;
 }
 
 interface CourseData {
-  id?: string; // Optional: if this is for editing an existing course
+  id?: string;
   code: string;
   name: string;
-  credits: number; // Updated to number to match schema
-  semester: number; // Added semester field
-  section?: string; // Optional: section field
-  timing?: string; // Optional: timing field
-  difficulty?: number; // Optional: difficulty field
-  grade?: string; // Optional: grade field
+  credits: number;
+  semester: number;
+  section?: string;
+  timing?: string;
+  difficulty?: number;
+  grade?: string;
 }
 
 export function AddCourseDialog({
@@ -37,66 +40,97 @@ export function AddCourseDialog({
   courseToEdit,
 }: AddCourseDialogProps) {
   const [courseData, setCourseData] = useState<CourseData>({
-    code: '',
-    name: '',
+    code: "",
+    name: "",
     credits: 0,
     semester: semester || 1,
-    section: '',
-    timing: '',
+    section: "",
+    timing: "",
     difficulty: 1,
-    grade: '', // New grade field
+    grade: "",
   });
 
-  // Preload course data when editing
+  const supabase = createClient();
+
   useEffect(() => {
     if (courseToEdit) {
       setCourseData(courseToEdit);
     } else {
-      // Reset form if no course is selected for editing
       setCourseData({
-        code: '',
-        name: '',
+        code: "",
+        name: "",
         credits: 0,
         semester: semester || 1,
-        section: '',
-        timing: '',
+        section: "",
+        timing: "",
         difficulty: 1,
-        grade: '', // Reset grade field
+        grade: "",
       });
     }
-  }, [courseToEdit, semester]); // This runs when courseToEdit or semester changes
+  }, [courseToEdit, semester]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Basic validation for required fields (code and name)
     if (!courseData.code || !courseData.name) {
-      alert('Please fill in the Course Code and Course Name');
+      toast({
+        title: "Error",
+        description: "Please fill in the Course Code and Course Name",
+        variant: "destructive",
+      });
       return;
     }
 
-    if (courseToEdit) {
-      // Edit existing course
-      onCourseEdit(courseData);
-    } else {
-      // Add new course
-      onCourseAdd(courseData);
+    try {
+      if (courseToEdit) {
+        const { error } = await supabase
+          .from("courses")
+          .update(courseData)
+          .eq("id", courseData.id);
+
+        if (error) throw error;
+
+        onCourseEdit(courseData);
+        toast({
+          title: "Success",
+          description: "Course updated successfully",
+        });
+      } else {
+        const { data, error } = await supabase
+          .from("courses")
+          .insert([courseData])
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        onCourseAdd(data);
+        toast({
+          title: "Success",
+          description: "Course added successfully",
+        });
+      }
+
+      setCourseData({
+        code: "",
+        name: "",
+        credits: 0,
+        semester: semester || 1,
+        section: "",
+        timing: "",
+        difficulty: 1,
+        grade: "",
+      });
+
+      onOpenChange(false);
+    } catch (error) {
+      console.error("Error saving course:", error);
+      toast({
+        title: "Error",
+        description: "Failed to save course",
+        variant: "destructive",
+      });
     }
-
-    // Reset the form after submission
-    setCourseData({
-      code: '',
-      name: '',
-      credits: 0,
-      semester: semester || 1,
-      section: '',
-      timing: '',
-      difficulty: 1,
-      grade: '', // Reset grade field
-    });
-
-    // Close the dialog
-    onOpenChange(false);
   };
 
   return (
@@ -134,7 +168,7 @@ export function AddCourseDialog({
                 id="credits"
                 type="number"
                 placeholder="3"
-                value={courseData.credits || ''}
+                value={courseData.credits || ""}
                 onChange={(e) => setCourseData({ ...courseData, credits: Number(e.target.value) })}
               />
             </div>
@@ -144,7 +178,7 @@ export function AddCourseDialog({
                 <Input
                   id="section"
                   placeholder="A1"
-                  value={courseData.section || ''}
+                  value={courseData.section || ""}
                   onChange={(e) => setCourseData({ ...courseData, section: e.target.value })}
                 />
               </div>
@@ -153,7 +187,7 @@ export function AddCourseDialog({
                 <Input
                   id="timing"
                   placeholder="e.g., MWF 09:00-10:20"
-                  value={courseData.timing || ''}
+                  value={courseData.timing || ""}
                   onChange={(e) => setCourseData({ ...courseData, timing: e.target.value })}
                 />
               </div>
@@ -180,13 +214,13 @@ export function AddCourseDialog({
               <Input
                 id="grade"
                 placeholder="A, B+, C, etc."
-                value={courseData.grade || ''}
+                value={courseData.grade || ""}
                 onChange={(e) => setCourseData({ ...courseData, grade: e.target.value })}
               />
             </div>
           </div>
           <DialogFooter>
-            <Button type="submit">{courseToEdit ? 'Update Course' : 'Add Course'}</Button>
+            <Button type="submit">{courseToEdit ? "Update Course" : "Add Course"}</Button>
           </DialogFooter>
         </form>
       </DialogContent>
