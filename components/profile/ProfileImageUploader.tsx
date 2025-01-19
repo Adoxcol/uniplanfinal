@@ -1,10 +1,11 @@
-"use client";
 import { useState } from "react";
-import { createClient } from "@/utils/supabase/client";
 import { toast } from "@/components/ui/use-toast";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+
+import imageCompression from "browser-image-compression";
+import { uploadImage } from "@/utils/supabase/storage/client";
 
 interface ProfileImageUploaderProps {
   profileImage: string;
@@ -17,75 +18,62 @@ export default function ProfileImageUploader({
   setProfileImage,
   fullName,
 }: ProfileImageUploaderProps) {
-  const supabase = createClient();
-
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (file) {
-      try {
-        const {
-          data: { user },
-          error: userError,
-        } = await supabase.auth.getUser();
+    if (!file) return;
 
-        if (userError || !user) {
-          toast({
-            title: "Error",
-            description: "No authenticated user found.",
-            variant: "destructive",
-          });
-          return;
-        }
+    try {
+      // Log the file details for debugging
+      console.log("File before compression:", file);
+      console.log("Original file size:", file.size);
 
-        const filePath = `${user.id}/avatar-${Date.now()}`;
-        const { data, error } = await supabase.storage
-          .from("avatars")
-          .upload(filePath, file);
+      // Compress the image and convert it to WebP
+      const compressedFile = await imageCompression(file, {
+        maxSizeMB: 1,
+        maxWidthOrHeight: 1024,
+        useWebWorker: true,
+        fileType: "image/webp", // WebP conversion
+      });
 
-        if (error) {
-          console.error("Error uploading image:", error);
-          toast({
-            title: "Error",
-            description: "Failed to upload image.",
-            variant: "destructive",
-          });
-          return;
-        }
+      // Log the compressed file details
+      console.log("Compressed file:", compressedFile);
+      console.log("Compressed file size:", compressedFile.size);
 
-        const { data: publicUrlData } = supabase.storage
-          .from("avatars")
-          .getPublicUrl(data.path);
+      // Upload image to Supabase
+      const { imageUrl, error } = await uploadImage({
+        file: compressedFile,
+        bucket: "avatars", // Replace with your actual bucket name
+      });
 
-        setProfileImage(publicUrlData.publicUrl);
-
-        // Update avatar URL in the profiles table
-        const { error: updateError } = await supabase
-          .from("profiles")
-          .update({ avatar_url: publicUrlData.publicUrl })
-          .eq("id", user.id);
-
-        if (updateError) {
-          console.error("Error updating avatar URL:", updateError);
-          toast({
-            title: "Error",
-            description: "Failed to update profile.",
-            variant: "destructive",
-          });
-          return;
-        }
-
-        toast({
-          title: "Success",
-          description: "Avatar updated successfully!",
-        });
-      } catch (error) {
-        console.error("Error uploading image:", error);
+      if (error) {
+        console.error("Supabase error:", error);
         toast({
           title: "Error",
-          description: "Failed to process or upload image.",
+          description: error,
           variant: "destructive",
         });
+        return;
       }
+
+      // Log the image URL after upload
+      console.log("Image URL:", imageUrl);
+
+      // Update the profile image in the state
+      setProfileImage(imageUrl);
+
+      // Optionally: You can update the profile image in Supabase profiles table here
+
+      toast({
+        title: "Success",
+        description: "Profile picture updated successfully!",
+      });
+    } catch (error) {
+      console.error("Unexpected error:", error);
+      toast({
+        title: "Error",
+        description: "An error occurred during the image upload process.",
+        variant: "destructive",
+      });
     }
   };
 

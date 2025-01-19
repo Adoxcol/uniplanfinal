@@ -18,10 +18,10 @@ export default function Home() {
             </div>
             <div className="space-x-4">
               <Button asChild size="lg">
-                <Link href="/planner">Start Planning</Link>
+                <Link href="/plans">Start Planning</Link>
               </Button>
               <Button asChild variant="outline" size="lg">
-                <Link href="/community">Join Community</Link>
+                <Link href="/forums">Join Community</Link>
               </Button>
             </div>
           </div>

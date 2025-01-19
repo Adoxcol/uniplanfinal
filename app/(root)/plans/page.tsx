@@ -35,6 +35,7 @@ export default function PlansPage() {
   const [planTitle, setPlanTitle] = useState("");
   const [planUniversity, setPlanUniversity] = useState("");
   const [loading, setLoading] = useState(false);
+  const [deletingPlanId, setDeletingPlanId] = useState<string | null>(null);
 
   // Fetch saved plans on component mount
   useEffect(() => {
@@ -56,7 +57,6 @@ export default function PlansPage() {
           return;
         }
 
-        // Fetch plans from the degree_plans table
         const { data: plans, error } = await supabase
           .from("degree_plans")
           .select("*")
@@ -118,19 +118,17 @@ export default function PlansPage() {
         return;
       }
 
-      // Generate a UUID for the new plan
       const newPlanId = uuidv4();
 
-      // Insert new plan into the degree_plans table
       const { data: newPlan, error } = await supabase
         .from("degree_plans")
         .insert([
           {
-            id: newPlanId, // Explicitly provide the UUID
+            id: newPlanId,
             user_id: user.id,
             title: planTitle,
             university: planUniversity,
-            total_credits: 0, // Default value
+            total_credits: 0,
             created_at: new Date().toISOString(),
           },
         ])
@@ -139,10 +137,7 @@ export default function PlansPage() {
 
       if (error) throw error;
 
-      // Update the plans state
       setPlans([...plans, newPlan]);
-
-      // Reset form and close modal
       setPlanTitle("");
       setPlanUniversity("");
       setIsModalOpen(false);
@@ -163,6 +158,32 @@ export default function PlansPage() {
     }
   };
 
+  // Handle deleting a plan
+  const handleDeletePlan = async (planId: string) => {
+    setDeletingPlanId(planId);
+    try {
+      const { error } = await supabase.from("degree_plans").delete().eq("id", planId);
+
+      if (error) throw error;
+
+      setPlans(plans.filter((plan) => plan.id !== planId));
+
+      toast({
+        title: "Success",
+        description: "Plan deleted successfully!",
+      });
+    } catch (error) {
+      console.error("Error deleting plan:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete plan.",
+        variant: "destructive",
+      });
+    } finally {
+      setDeletingPlanId(null);
+    }
+  };
+
   // Navigate to the planner page for a specific plan
   const handlePlanClick = (planId: string) => {
     router.push(`/planner/${planId}`);
@@ -173,12 +194,10 @@ export default function PlansPage() {
       <main className="container mx-auto px-4 py-8">
         <h1 className="text-2xl font-bold mb-6 text-gray-900 dark:text-gray-100">My Degree Plans</h1>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {/* Display existing plans */}
           {plans.map((plan) => (
             <Card
               key={plan.id}
               className="bg-white dark:bg-gray-800 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
-              onClick={() => handlePlanClick(plan.id)} // Make the card clickable
             >
               <CardHeader>
                 <CardTitle className="text-gray-900 dark:text-gray-100">{plan.title}</CardTitle>
@@ -187,17 +206,26 @@ export default function PlansPage() {
                 <p className="text-gray-700 dark:text-gray-300">
                   {plan.university || "No university specified"}
                 </p>
-                <p className="text-gray-700 dark:text-gray-300">
-                  Total Credits: {plan.total_credits}
-                </p>
+                <p className="text-gray-700 dark:text-gray-300">Total Credits: {plan.total_credits}</p>
                 <p className="text-gray-700 dark:text-gray-300">
                   Created: {new Date(plan.created_at).toLocaleDateString()}
                 </p>
+                <div className="flex justify-between mt-4">
+                  <Button variant="outline" onClick={() => handlePlanClick(plan.id)}>
+                    Open
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    onClick={() => handleDeletePlan(plan.id)}
+                    disabled={deletingPlanId === plan.id}
+                  >
+                    {deletingPlanId === plan.id ? "Deleting..." : "Delete"}
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           ))}
 
-          {/* Add new plan card */}
           {plans.length < 3 && (
             <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
               <DialogTrigger asChild>
