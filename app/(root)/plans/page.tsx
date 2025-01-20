@@ -23,6 +23,7 @@ interface Plan {
   title: string;
   university?: string;
   total_credits: number;
+  cumulative_gpa: string;
   created_at: string;
 }
 
@@ -128,7 +129,8 @@ export default function PlansPage() {
             user_id: user.id,
             title: planTitle,
             university: planUniversity,
-            total_credits: 0,
+            total_credits: 0, // Initialize total credits to 0
+            cumulative_gpa: "0.0", // Initialize CGPA to "0.0"
             created_at: new Date().toISOString(),
           },
         ])
@@ -184,6 +186,44 @@ export default function PlansPage() {
     }
   };
 
+  // Handle updating a plan's title, university, total credits, or CGPA
+  const handleUpdatePlan = async (
+    planId: string,
+    updatedFields: {
+      title?: string;
+      university?: string;
+      total_credits?: number;
+      cumulative_gpa?: string;
+    }
+  ) => {
+    try {
+      const { error } = await supabase
+        .from("degree_plans")
+        .update(updatedFields)
+        .eq("id", planId);
+
+      if (error) throw error;
+
+      setPlans((prevPlans) =>
+        prevPlans.map((plan) =>
+          plan.id === planId ? { ...plan, ...updatedFields } : plan
+        )
+      );
+
+      toast({
+        title: "Success",
+        description: "Plan updated successfully!",
+      });
+    } catch (error) {
+      console.error("Error updating plan:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update plan.",
+        variant: "destructive",
+      });
+    }
+  };
+
   // Navigate to the planner page for a specific plan
   const handlePlanClick = (planId: string) => {
     router.push(`/planner/${planId}`);
@@ -200,13 +240,20 @@ export default function PlansPage() {
               className="bg-white dark:bg-gray-800 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
             >
               <CardHeader>
-                <CardTitle className="text-gray-900 dark:text-gray-100">{plan.title}</CardTitle>
+                <EditableText
+                  text={plan.title}
+                  onSave={(newText) => handleUpdatePlan(plan.id, { title: newText })}
+                  className="text-gray-900 dark:text-gray-100 font-bold text-xl"
+                />
               </CardHeader>
               <CardContent>
-                <p className="text-gray-700 dark:text-gray-300">
-                  {plan.university || "No university specified"}
-                </p>
+                <EditableText
+                  text={plan.university || "No university specified"}
+                  onSave={(newText) => handleUpdatePlan(plan.id, { university: newText })}
+                  className="text-gray-700 dark:text-gray-300"
+                />
                 <p className="text-gray-700 dark:text-gray-300">Total Credits: {plan.total_credits}</p>
+                <p className="text-gray-700 dark:text-gray-300">Cumulative GPA: {plan.cumulative_gpa}</p>
                 <p className="text-gray-700 dark:text-gray-300">
                   Created: {new Date(plan.created_at).toLocaleDateString()}
                 </p>
@@ -276,6 +323,52 @@ export default function PlansPage() {
           )}
         </div>
       </main>
+    </div>
+  );
+}
+
+// EditableText Component for Double-Click Editing
+interface EditableTextProps {
+  text: string;
+  onSave: (newText: string) => void;
+  className?: string;
+}
+
+function EditableText({ text, onSave, className }: EditableTextProps) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedText, setEditedText] = useState(text);
+
+  const handleDoubleClick = () => {
+    setIsEditing(true);
+  };
+
+  const handleBlur = () => {
+    setIsEditing(false);
+    onSave(editedText);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      setIsEditing(false);
+      onSave(editedText);
+    }
+  };
+
+  return (
+    <div onDoubleClick={handleDoubleClick}>
+      {isEditing ? (
+        <input
+          type="text"
+          value={editedText}
+          onChange={(e) => setEditedText(e.target.value)}
+          onBlur={handleBlur}
+          onKeyDown={handleKeyDown}
+          autoFocus
+          className={`w-full bg-transparent border-b border-gray-300 focus:outline-none ${className}`}
+        />
+      ) : (
+        <span className={className}>{text}</span>
+      )}
     </div>
   );
 }
