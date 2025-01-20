@@ -58,6 +58,29 @@
     --chart-5: 340 75% 55%;
   }
 }
+.avatar-upload {
+  @apply flex flex-col items-center gap-4;
+}
+
+.avatar-preview {
+  @apply relative w-32 h-32 rounded-full overflow-hidden border-4 border-white dark:border-gray-800 shadow-lg;
+}
+
+.avatar-image {
+  @apply object-cover w-full h-full;
+}
+
+.avatar-placeholder {
+  @apply w-full h-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center;
+}
+
+.upload-button {
+  @apply cursor-pointer px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors;
+}
+
+.hidden-input {
+  @apply hidden;
+}
 
 @layer base {
   * {

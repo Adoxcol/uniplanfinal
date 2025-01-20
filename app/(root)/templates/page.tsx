@@ -33,7 +33,7 @@ export default function TemplatePage() {
     }
 
     const plansWithAverageRatings = publicPlans.map((plan) => {
-      const totalStars = plan.ratings.reduce((sum, rating) => sum + rating.stars, 0);
+      const totalStars = plan.ratings.reduce((sum: any, rating: { stars: any; }) => sum + rating.stars, 0);
       const averageRating = totalStars / plan.ratings.length || 0;
       return {
         ...plan,
@@ -45,7 +45,7 @@ export default function TemplatePage() {
     setPlans(plansWithAverageRatings);
   };
 
-  const handleDuplicatePlan = async (planId) => {
+  const handleDuplicatePlan = async (planId: any) => {
     try {
       // Fetch the authenticated user
       const { data: { user }, error: userError } = await supabase.auth.getUser();

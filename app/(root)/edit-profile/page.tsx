@@ -6,17 +6,18 @@ import { toast } from "@/components/ui/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import DeleteProfileDialog from "@/components/profile/DeleteProfileDialog";
 import ProfileForm from "@/components/profile/ProfileForm";
-import ProfileImageUploader from "@/components/profile/ProfileImageUploader";
 import ProjectsSection from "@/components/profile/ProjectSection";
 import SkillsInput from "@/components/profile/SkillsInput";
 import { Button } from "@/components/ui/button";
 import { Project } from "next/dist/build/swc/types";
-
+import AvatarUpload from "@/components/profile/AvatarUpload";
+import { User } from "@supabase/supabase-js";
 
 export default function EditProfilePage() {
   const supabase = createClient();
   const router = useRouter();
 
+  const [user, setUser] = useState<User | null>(null);
   const [profileImage, setProfileImage] = useState("/placeholder.svg");
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -28,16 +29,13 @@ export default function EditProfilePage() {
   const [loading, setLoading] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isUsernameEditable, setIsUsernameEditable] = useState(true);
+  const [refreshKey, setRefreshKey] = useState(0); // Add refresh key
 
-  // Fetch profile data on component mount
   useEffect(() => {
     const fetchProfile = async () => {
       setLoading(true);
       try {
-        const {
-          data: { user },
-          error: userError,
-        } = await supabase.auth.getUser();
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
 
         if (userError || !user) {
           toast({
@@ -49,6 +47,8 @@ export default function EditProfilePage() {
           return;
         }
 
+        setUser(user);
+
         const { data: profile, error: profileError } = await supabase
           .from("profiles")
           .select("*")
@@ -57,7 +57,12 @@ export default function EditProfilePage() {
 
         if (profileError) throw profileError;
 
-        setProfileImage(profile.avatar_url || "/placeholder.svg");
+        // Get fresh image URL with cache busting
+        const avatarUrl = profile.avatar_url 
+          ? `${profile.avatar_url}?${Date.now()}`
+          : "/placeholder.svg";
+
+        setProfileImage(avatarUrl);
         setFullName(profile.full_name || "");
         setEmail(profile.email || "");
         setBio(profile.bio || "");
@@ -66,9 +71,7 @@ export default function EditProfilePage() {
         setProjects(Array.isArray(profile.projects) ? profile.projects : []);
         setUsername(profile.username || "");
 
-        if (profile.username) {
-          setIsUsernameEditable(false);
-        }
+        if (profile.username) setIsUsernameEditable(false);
       } catch (error) {
         console.error("Error fetching profile:", error);
         toast({
@@ -82,38 +85,24 @@ export default function EditProfilePage() {
     };
 
     fetchProfile();
-  }, [supabase, router]);
+  }, [supabase, router, refreshKey]); // Add refreshKey to dependencies
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!email) {
+    if (!user) {
       toast({
         title: "Error",
-        description: "Email is required.",
+        description: "No authenticated user found.",
         variant: "destructive",
       });
+      router.push("/login");
       return;
     }
 
     setLoading(true);
 
     try {
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser();
-
-      if (userError || !user) {
-        toast({
-          title: "Error",
-          description: "No authenticated user found.",
-          variant: "destructive",
-        });
-        router.push("/login");
-        return;
-      }
-
       const processedSkills = skills
         .split(",")
         .map((skill) => skill.trim())
@@ -122,37 +111,33 @@ export default function EditProfilePage() {
       const updatedProfile = {
         id: user.id,
         full_name: fullName,
-        email: email,
+        email,
         bio,
         education,
         skills: processedSkills,
-        projects: projects,
-        avatar_url: profileImage,
-        username: username,
+        projects,
+        avatar_url: profileImage.split('?')[0], // Remove cache busting parameter
+        username,
       };
 
       const { error } = await supabase.from("profiles").upsert(updatedProfile);
 
-      if (error) {
-        console.error("Supabase error:", error);
-        toast({
-          title: "Error",
-          description: error.message,
-          variant: "destructive",
-        });
-        return;
-      }
+      if (error) throw error;
 
       toast({
         title: "Success",
         description: "Profile updated successfully!",
       });
-      router.push("/profile");
+      
+      // Force refresh of data with cache busting
+      setRefreshKey(prev => prev + 1);
+      router.refresh(); // Refresh Next.js router cache
+
     } catch (error) {
-      console.error("Unexpected error:", error);
+      console.error("Error updating profile:", error);
       toast({
         title: "Error",
-        description: "An unexpected error occurred. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to update profile",
         variant: "destructive",
       });
     } finally {
@@ -161,26 +146,35 @@ export default function EditProfilePage() {
   };
 
   const handleDeleteProfile = async () => {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    if (!user) return;
 
-    if (user) {
-      const { error } = await supabase.from("profiles").delete().eq("id", user.id);
-
-      if (error) {
-        toast({
-          title: "Error",
-          description: error.message,
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "Success",
-          description: "Profile deleted successfully!",
-        });
-        router.push("/");
+    try {
+      // Delete avatar from storage
+      if (profileImage && profileImage.startsWith('http')) {
+        const filePath = profileImage.split('/').pop()?.split('?')[0];
+        if (filePath) {
+          await supabase.storage
+            .from('avatars')
+            .remove([filePath]);
+        }
       }
+
+      // Delete profile from database
+      const { error } = await supabase.from("profiles").delete().eq("id", user.id);
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Profile deleted successfully!",
+      });
+      router.push("/");
+    } catch (error) {
+      console.error("Error deleting profile:", error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to delete profile",
+        variant: "destructive",
+      });
     }
   };
 
@@ -193,10 +187,14 @@ export default function EditProfilePage() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-6">
-              <ProfileImageUploader
-                profileImage={profileImage}
-                setProfileImage={setProfileImage}
-                fullName={fullName}
+              <AvatarUpload
+                uid={user?.id || ""}
+                url={profileImage}
+                onUpload={(newUrl) => {
+                  setProfileImage(`${newUrl}?${Date.now()}`); // Immediate update with cache bust
+                  setRefreshKey(prev => prev + 1); // Force data refresh
+                }}
+                className="mb-8"
               />
               <ProfileForm
                 fullName={fullName}
@@ -224,6 +222,7 @@ export default function EditProfilePage() {
                     variant="outline"
                     type="button"
                     onClick={() => router.push("/profile")}
+                    disabled={loading}
                   >
                     Cancel
                   </Button>

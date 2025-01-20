@@ -65,3 +65,10 @@ export interface Profile {
   avatar_url?: string; // Optional: Avatar URL of the profile
 }
 
+interface Rating {
+  id: string; // Unique identifier for the rating
+  plan_id: string; // ID of the degree plan being rated
+  user_id: string; // ID of the user who submitted the rating
+  stars: number; // Number of stars (e.g., 1 to 5)
+  created_at: string; // Timestamp of when the rating was created
+}
