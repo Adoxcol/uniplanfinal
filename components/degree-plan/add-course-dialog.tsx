@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { toast } from "@/components/ui/use-toast";
 import { createClient } from "@/utils/supabase/client";
-import { Course } from "@/types/types";
+import { Course, Grade } from "@/types/types"; // Import Grade type
 
 // Function to generate UUID v4
 function generateUUID() {
@@ -48,7 +48,7 @@ export function AddCourseDialog({
     section: "",
     timing: "",
     difficulty: 1,
-    grade: "",
+    grade: undefined, // Initialize as undefined instead of an empty string
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   });
@@ -69,7 +69,7 @@ export function AddCourseDialog({
         section: "",
         timing: "",
         difficulty: 1,
-        grade: "",
+        grade: undefined, // Initialize as undefined
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       });
@@ -89,28 +89,31 @@ export function AddCourseDialog({
     }
 
     try {
+      const updatedCourse = {
+        ...courseData,
+        grade: courseData.grade || null, // Convert undefined to null for Supabase
+      };
+
       if (courseToEdit) {
         const { error } = await supabase
           .from("courses")
           .update({
-            ...courseData,
-            degree_plan_id: degreePlanId, // Ensure degree_plan_id is included
+            ...updatedCourse,
             updated_at: new Date().toISOString(),
           })
           .eq("id", courseToEdit.id);
 
         if (error) throw error;
 
-        onCourseEdit(courseData);
+        onCourseEdit(updatedCourse);
         toast({
           title: "Success",
           description: "Course updated successfully",
         });
       } else {
         const newCourse = {
-          ...courseData,
+          ...updatedCourse,
           id: generateUUID(),
-          degree_plan_id: degreePlanId, // Ensure degree_plan_id is included
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         };
@@ -141,7 +144,7 @@ export function AddCourseDialog({
         section: "",
         timing: "",
         difficulty: 1,
-        grade: "",
+        grade: undefined, // Reset to undefined
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       });
@@ -238,9 +241,14 @@ export function AddCourseDialog({
               <Label htmlFor="grade">Grade (Optional)</Label>
               <Input
                 id="grade"
-                placeholder="A, B+, C, etc."
+                placeholder="A, B, C, etc."
                 value={courseData.grade || ""}
-                onChange={(e) => setCourseData({ ...courseData, grade: e.target.value })}
+                onChange={(e) => {
+                  const value = e.target.value.toUpperCase();
+                  if (value === "" || ["A", "B", "C", "D", "F", "W"].includes(value)) {
+                    setCourseData({ ...courseData, grade: value as Grade | undefined });
+                  }
+                }}
               />
             </div>
           </div>

@@ -5,10 +5,16 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { PlusCircle, X, Edit2, Trash2, Save } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
+import { Project } from '@/types/profile';
 
 // Enhanced Skills Input Component
-export const EnhancedSkillsInput = ({ skills, setSkills }) => {
-  const [newSkill, setNewSkill] = useState("");
+interface EnhancedSkillsInputProps {
+  skills: string[];
+  setSkills: React.Dispatch<React.SetStateAction<string[]>>;
+}
+
+export const EnhancedSkillsInput = ({ skills, setSkills }: EnhancedSkillsInputProps) => {
+  const [newSkill, setNewSkill] = useState<string>("");
 
   const handleAddSkill = () => {
     if (newSkill.trim() && !skills.includes(newSkill.trim())) {
@@ -17,7 +23,7 @@ export const EnhancedSkillsInput = ({ skills, setSkills }) => {
     }
   };
 
-  const handleRemoveSkill = (skillToRemove) => {
+  const handleRemoveSkill = (skillToRemove: string) => {
     setSkills(skills.filter(skill => skill !== skillToRemove));
   };
 
@@ -60,15 +66,20 @@ export const EnhancedSkillsInput = ({ skills, setSkills }) => {
 };
 
 // Enhanced Projects Section Component
-export const EnhancedProjectsSection = ({ projects, setProjects }) => {
-  const [editingProject, setEditingProject] = useState(null);
-  const [newProject, setNewProject] = useState({
+interface EnhancedProjectsSectionProps {
+  projects: Project[];
+  setProjects: React.Dispatch<React.SetStateAction<Project[]>>;
+}
+
+export const EnhancedProjectsSection = ({ projects, setProjects }: EnhancedProjectsSectionProps) => {
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
+  const [newProject, setNewProject] = useState<Omit<Project, 'id'>>({
     title: "",
     description: "",
     image: "",
     tags: []
   });
-  const [newTag, setNewTag] = useState("");
+  const [newTag, setNewTag] = useState<string>("");
 
   const handleAddProject = () => {
     if (newProject.title.trim()) {
@@ -77,34 +88,36 @@ export const EnhancedProjectsSection = ({ projects, setProjects }) => {
     }
   };
 
-  const handleUpdateProject = (id) => {
+  const handleUpdateProject = (id: number) => {
+    if (!editingProject) return;
+    
     setProjects(projects.map(p => p.id === id ? editingProject : p));
     setEditingProject(null);
   };
 
-  const handleDeleteProject = (id) => {
+  const handleDeleteProject = (id: number) => {
     setProjects(projects.filter(p => p.id !== id));
   };
 
-  const handleAddTag = (projectId) => {
-    if (newTag.trim()) {
-      if (editingProject && editingProject.id === projectId) {
-        setEditingProject({
-          ...editingProject,
-          tags: [...editingProject.tags, newTag.trim()]
-        });
-      } else {
-        setNewProject({
-          ...newProject,
-          tags: [...newProject.tags, newTag.trim()]
-        });
-      }
-      setNewTag("");
+  const handleAddTag = (projectId: number | null) => {
+    if (!newTag.trim()) return;
+
+    if (projectId && editingProject) {
+      setEditingProject({
+        ...editingProject,
+        tags: [...editingProject.tags, newTag.trim()]
+      });
+    } else {
+      setNewProject({
+        ...newProject,
+        tags: [...newProject.tags, newTag.trim()]
+      });
     }
+    setNewTag("");
   };
 
-  const handleRemoveTag = (projectId, tagToRemove) => {
-    if (editingProject && editingProject.id === projectId) {
+  const handleRemoveTag = (projectId: number | null, tagToRemove: string) => {
+    if (projectId && editingProject) {
       setEditingProject({
         ...editingProject,
         tags: editingProject.tags.filter(tag => tag !== tagToRemove)

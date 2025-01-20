@@ -2,17 +2,11 @@
 
 import { Card } from '@/components/ui/card';
 import { Progress } from '../ui/progress';
-
-type Grade = 'A' | 'B' | 'C' | 'D' | 'F';
-
-interface Course {
-  credits: number;
-  grade?: Grade; // Optional grade field
-}
+import { Course, Grade } from '@/types/types'; // Import shared types
 
 interface DegreeStatsProps {
-  courses?: Course[]; // Make courses optional with a default value
-  maxCredits?: number; // Allow maxCredits to be passed as a prop
+  courses?: Course[];
+  maxCredits?: number;
 }
 
 export function DegreeStats({ courses = [], maxCredits = 120 }: DegreeStatsProps) {
@@ -22,7 +16,7 @@ export function DegreeStats({ courses = [], maxCredits = 120 }: DegreeStatsProps
   // Calculate GPA
   const calculateGpa = (courses: Course[]): string => {
     const gradePoints = courses.reduce((acc, course) => {
-      if (course.grade) {
+      if (course.grade && course.grade !== 'W') {
         const gradeValue = {
           'A': 4.0,
           'B': 3.0,
@@ -35,7 +29,9 @@ export function DegreeStats({ courses = [], maxCredits = 120 }: DegreeStatsProps
       return acc;
     }, 0);
 
-    const totalGpaCredits = courses.reduce((acc, course) => acc + (course.grade ? course.credits : 0), 0);
+    const totalGpaCredits = courses.reduce((acc, course) => 
+      acc + (course.grade && course.grade !== 'W' ? course.credits : 0), 0
+    );
     return totalGpaCredits > 0 ? (gradePoints / totalGpaCredits).toFixed(2) : '0.00';
   };
 

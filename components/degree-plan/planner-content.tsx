@@ -1,15 +1,14 @@
-'use client'; // Ensure this is a client component
-
+'use client';
 import { useState, useEffect } from 'react';
 import { DegreePlanHeader } from "@/components/degree-plan/DegreePlanHeader";
 import { SemesterGrid } from "@/components/degree-plan/SemesterGrid";
 import { NotesPanel } from "@/components/degree-plan/NotesPanel";
 import { DegreeStats } from "@/components/degree-plan/degree-stats";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
-import { Course } from "@/types/types";
+import { Course, Grade } from "@/types/types"; // Import shared types
 import { supabase } from '@/lib/supbaseClient';
 import { AddCourseDialog } from './add-course-dialog';
-import { toast } from "@/components/ui/use-toast"; // Import toast
+import { toast } from "@/components/ui/use-toast";
 
 interface PlannerContentProps {
   initialDegreePlan: any;
@@ -20,51 +19,64 @@ export function PlannerContent({ initialDegreePlan, initialCourses }: PlannerCon
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedSemester, setSelectedSemester] = useState<number | null>(null);
   const [courseToEdit, setCourseToEdit] = useState<Course | null>(null);
-  const [notes, setNotes] = useState<string[]>(initialDegreePlan.notes ? JSON.parse(initialDegreePlan.notes) : []);
+  const [notes, setNotes] = useState<string[]>(
+    initialDegreePlan.notes ? JSON.parse(initialDegreePlan.notes) : []
+  );
   const [newNote, setNewNote] = useState("");
-  const [courses, setCourses] = useState<Course[]>(initialCourses);
+  const [courses, setCourses] = useState<Course[]>(
+    initialCourses.map(c => ({
+      ...c,
+      grade: c.grade as Grade | undefined // Type assertion for Grade
+    }))
+  );
   const [semesters, setSemesters] = useState<number[]>(
     initialDegreePlan.semesters || [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
   );
   const [isPublic, setIsPublic] = useState(initialDegreePlan.is_public || false);
 
   useEffect(() => {
-    // Optionally, perform any actions when the component mounts or updates
+    // Optional mount/update logic
   }, [courses, semesters, notes]);
 
   const handleAddCourse = (semester: number) => {
     setSelectedSemester(semester);
-    setCourseToEdit(null); // Reset course to edit
-    setIsDialogOpen(true); // Open dialog
+    setCourseToEdit(null);
+    setIsDialogOpen(true);
   };
 
   const handleEditCourse = (course: Course) => {
-    setCourseToEdit(course); // Set the course to edit
-    setSelectedSemester(course.semester); // Set the selected semester
-    setIsDialogOpen(true); // Open dialog
+    setCourseToEdit(course);
+    setSelectedSemester(course.semester);
+    setIsDialogOpen(true);
   };
 
   const handleCourseAdd = (course: Course) => {
-    setCourses(prevCourses => [...prevCourses, course]); // Add the new course to the list
+    setCourses(prevCourses => [...prevCourses, {
+      ...course,
+      grade: course.grade as Grade | undefined
+    }]);
   };
 
   const handleCourseEdit = (updatedCourse: Course) => {
     setCourses(prevCourses =>
       prevCourses.map(course =>
-        course.id === updatedCourse.id ? updatedCourse : course
+        course.id === updatedCourse.id ? {
+          ...updatedCourse,
+          grade: updatedCourse.grade as Grade | undefined
+        } : course
       )
-    ); // Edit the existing course in the list
+    );
   };
 
   const handleDeleteCourse = async (courseId: string) => {
-    setCourses(prevCourses => prevCourses.filter(course => course.id !== courseId)); // Remove course from the list
+    setCourses(prevCourses => prevCourses.filter(course => course.id !== courseId));
   };
 
   const handleAddSemester = () => {
-    if (semesters.length < 15) { // Limit to 15 semesters
+    if (semesters.length < 15) {
       setSemesters(prevSemesters => {
         const nextSemester = prevSemesters.length > 0 ? Math.max(...prevSemesters) + 1 : 1;
-        return [...prevSemesters, nextSemester]; // Add the next semester number
+        return [...prevSemesters, nextSemester];
       });
     } else {
       toast({
@@ -77,45 +89,34 @@ export function PlannerContent({ initialDegreePlan, initialCourses }: PlannerCon
 
   const handleSaveDegreePlan = async () => {
     try {
-      // Save the degree plan
       const { data: degreePlan, error: degreePlanError } = await supabase
         .from("degree_plans")
-        .upsert([
-          {
-            id: initialDegreePlan.id, // Use the existing ID if updating, or insert if creating a new plan
-            title: initialDegreePlan.title,
-            university: initialDegreePlan.university,
-            is_public: isPublic,
-            notes: JSON.stringify(notes), // Store notes as a JSON string
-            semesters,
-          },
-        ])
+        .upsert([{
+          id: initialDegreePlan.id,
+          title: initialDegreePlan.title,
+          university: initialDegreePlan.university,
+          is_public: isPublic,
+          notes: JSON.stringify(notes),
+          semesters,
+        }])
         .select()
         .single();
-  
-      if (degreePlanError) {
-        throw new Error(degreePlanError.message);
-      }
-  
-      // Save courses in the `courses` table
+
+      if (degreePlanError) throw new Error(degreePlanError.message);
+
       const { error: coursesError } = await supabase
         .from("courses")
-        .upsert(
-          courses.map((course) => ({
-            ...course,
-            degree_plan_id: degreePlan.id, // Link courses to the degree plan
-          }))
-        );
-  
-      if (coursesError) {
-        throw new Error(coursesError.message);
-      }
-  
+        .upsert(courses.map(course => ({
+          ...course,
+          degree_plan_id: degreePlan.id
+        })));
+
+      if (coursesError) throw new Error(coursesError.message);
+
       toast({
         title: "Success",
         description: "Degree plan and courses saved successfully!",
       });
-      console.log("Saved Degree Plan:", degreePlan);
     } catch (error) {
       toast({
         title: "Error",
@@ -131,10 +132,11 @@ export function PlannerContent({ initialDegreePlan, initialCourses }: PlannerCon
       <DegreePlanHeader
         title={initialDegreePlan.title || "New Plan"}
         university={initialDegreePlan.university || "No university specified"}
-        onSave={handleSaveDegreePlan} // Save button handler
-        onUpdate={function (updatedFields: { title?: string; university?: string; }): void {
-          throw new Error('Function not implemented.');
-        } }      />
+        onSave={handleSaveDegreePlan}
+        onUpdate={(updatedFields: { title?: string; university?: string }) => {
+          // Implement update logic here
+        }}
+      />
 
       <div className="mb-4">
         <button
@@ -150,7 +152,7 @@ export function PlannerContent({ initialDegreePlan, initialCourses }: PlannerCon
           <input
             type="checkbox"
             checked={isPublic}
-            onChange={() => setIsPublic(!isPublic)} // Toggle public/private state
+            onChange={() => setIsPublic(!isPublic)}
             className="mr-2"
           />
           <span className="text-sm font-medium text-gray-700">
@@ -199,7 +201,7 @@ export function PlannerContent({ initialDegreePlan, initialCourses }: PlannerCon
         open={isDialogOpen}
         onOpenChange={setIsDialogOpen}
         semester={selectedSemester}
-        degreePlanId={initialDegreePlan.id} // Pass degreePlanId to link courses
+        degreePlanId={initialDegreePlan.id}
         courseToEdit={courseToEdit}
         onCourseAdd={handleCourseAdd}
         onCourseEdit={handleCourseEdit}

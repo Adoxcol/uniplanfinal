@@ -1,16 +1,25 @@
-// context/ProfileContext.tsx
 'use client';
-
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState, Dispatch, SetStateAction } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { useRouter } from 'next/navigation';
+import { Profile } from '@/types/profile';
 
-const ProfileContext = createContext(null);
+type ProfileContextType = {
+  profile: Profile | null;
+  setProfile: Dispatch<SetStateAction<Profile | null>>;
+  loading: boolean;
+};
 
-export function ProfileProvider({ children }) {
+const ProfileContext = createContext<ProfileContextType>({
+  profile: null,
+  setProfile: () => {},
+  loading: true,
+});
+
+export function ProfileProvider({ children }: { children: React.ReactNode }) {
   const supabase = createClient();
   const router = useRouter();
-  const [profile, setProfile] = useState(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -21,13 +30,13 @@ export function ProfileProvider({ children }) {
         return;
       }
 
-      const { data: profile } = await supabase
+      const { data } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', user.id)
         .single();
 
-      setProfile(profile);
+      setProfile(data);
       setLoading(false);
     };
 
@@ -48,9 +57,5 @@ export function ProfileProvider({ children }) {
 }
 
 export function useProfile() {
-  const context = useContext(ProfileContext);
-  if (!context) {
-    throw new Error('useProfile must be used within a ProfileProvider');
-  }
-  return context;
+  return useContext(ProfileContext);
 }
