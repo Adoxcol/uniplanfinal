@@ -9,6 +9,7 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/componen
 import { Course } from "@/types/types";
 import { supabase } from '@/lib/supbaseClient';
 import { AddCourseDialog } from './add-course-dialog';
+import { toast } from "@/components/ui/use-toast"; // Import toast
 
 interface PlannerContentProps {
   initialDegreePlan: any;
@@ -60,13 +61,17 @@ export function PlannerContent({ initialDegreePlan, initialCourses }: PlannerCon
   };
 
   const handleAddSemester = () => {
-    if (semesters.length < 15) { // Limit to 8 semesters
+    if (semesters.length < 15) { // Limit to 15 semesters
       setSemesters(prevSemesters => {
         const nextSemester = prevSemesters.length > 0 ? Math.max(...prevSemesters) + 1 : 1;
         return [...prevSemesters, nextSemester]; // Add the next semester number
       });
     } else {
-      alert("Maximum number of semesters reached (8).");
+      toast({
+        title: "Error",
+        description: "Maximum number of semesters reached (15).",
+        variant: "destructive",
+      });
     }
   };
 
@@ -106,10 +111,17 @@ export function PlannerContent({ initialDegreePlan, initialCourses }: PlannerCon
         throw new Error(coursesError.message);
       }
   
-      alert("Degree plan and courses saved successfully!");
+      toast({
+        title: "Success",
+        description: "Degree plan and courses saved successfully!",
+      });
       console.log("Saved Degree Plan:", degreePlan);
     } catch (error) {
-      alert("Error saving degree plan: " + error.message);
+      toast({
+        title: "Error",
+        description: "Failed to save degree plan: " + (error instanceof Error ? error.message : String(error)),
+        variant: "destructive",
+      });
       console.error(error);
     }
   };
@@ -120,7 +132,9 @@ export function PlannerContent({ initialDegreePlan, initialCourses }: PlannerCon
         title={initialDegreePlan.title || "New Plan"}
         university={initialDegreePlan.university || "No university specified"}
         onSave={handleSaveDegreePlan} // Save button handler
-      />
+        onUpdate={function (updatedFields: { title?: string; university?: string; }): void {
+          throw new Error('Function not implemented.');
+        } }      />
 
       <div className="mb-4">
         <button
