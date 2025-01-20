@@ -1,10 +1,10 @@
 "use client";
 import { SemesterCard } from "@/components/degree-plan/semester-card";
-import { Course } from "@/types/types";
+import { Course } from "@/types/types"; // Ensure this is the correct import
 
 interface SemesterGridProps {
   courses: Course[];
-  semesters: number[]; // Add semesters as a prop
+  semesters: number[];
   onAddCourse: (semester: number) => void;
   onDeleteCourse: (courseId: string) => void;
   onEditCourse: (course: Course) => void;
@@ -12,7 +12,7 @@ interface SemesterGridProps {
 
 export function SemesterGrid({
   courses,
-  semesters, // Destructure semesters from props
+  semesters,
   onAddCourse,
   onDeleteCourse,
   onEditCourse,

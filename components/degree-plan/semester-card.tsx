@@ -4,28 +4,25 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Plus, Edit, Trash, Clock } from 'lucide-react';
-
-interface Course {
-  id: string;
-  code: string;
-  name: string;
-  credits: number;
-  semester: number;
-  grade?: string;
-  section?: string;
-  timing?: string;
-  difficulty?: number;
-}
+import { Course } from '@/types/types'; // Import the shared Course type
 
 interface SemesterCardProps {
   semester: number;
-  courses: Course[]; // Ensure courses is always an array
+  courses: Course[]; // Use the shared Course type
   onAddCourse: () => void;
   onEditCourse: (course: Course) => void;
   onDeleteCourse: (courseId: string) => void;
 }
 
-function CourseItem({ course, onEditCourse, onDeleteCourse }: { course: Course, onEditCourse: (course: Course) => void, onDeleteCourse: (courseId: string) => void }) {
+function CourseItem({ 
+  course, 
+  onEditCourse, 
+  onDeleteCourse 
+}: { 
+  course: Course; 
+  onEditCourse: (course: Course) => void; 
+  onDeleteCourse: (courseId: string) => void; 
+}) {
   return (
     <Card className="p-3">
       <div className="flex items-start gap-2">
