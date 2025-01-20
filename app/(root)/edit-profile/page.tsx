@@ -6,91 +6,60 @@ import { toast } from "@/components/ui/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import DeleteProfileDialog from "@/components/profile/DeleteProfileDialog";
 import ProfileForm from "@/components/profile/ProfileForm";
-import ProjectsSection from "@/components/profile/ProjectSection";
-import SkillsInput from "@/components/profile/SkillsInput";
 import { Button } from "@/components/ui/button";
-import { Project } from "next/dist/build/swc/types";
 import AvatarUpload from "@/components/profile/AvatarUpload";
-import { User } from "@supabase/supabase-js";
+import { EnhancedProjectsSection, EnhancedSkillsInput } from "@/components/profile/EnhancedProfileSection";
+import { useProfile } from '@/context/ProfileContext'; // Import the profile context
+
+interface Project {
+  id: number;
+  title: string;
+  description: string;
+  image: string;
+  tags: string[];
+}
 
 export default function EditProfilePage() {
   const supabase = createClient();
   const router = useRouter();
+  const { profile: contextProfile, setProfile: setContextProfile } = useProfile(); // Use profile context
 
-  const [user, setUser] = useState<User | null>(null);
   const [profileImage, setProfileImage] = useState("/placeholder.svg");
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [bio, setBio] = useState("");
   const [education, setEducation] = useState("");
-  const [skills, setSkills] = useState("");
+  const [skills, setSkills] = useState<string[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [username, setUsername] = useState("");
   const [loading, setLoading] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isUsernameEditable, setIsUsernameEditable] = useState(true);
-  const [refreshKey, setRefreshKey] = useState(0); // Add refresh key
 
+  // Initialize form with context profile data
   useEffect(() => {
-    const fetchProfile = async () => {
-      setLoading(true);
-      try {
-        const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (contextProfile) {
+      const avatarUrl = contextProfile.avatar_url 
+        ? `${contextProfile.avatar_url}?${Date.now()}`
+        : "/placeholder.svg";
 
-        if (userError || !user) {
-          toast({
-            title: "Error",
-            description: "No authenticated user found.",
-            variant: "destructive",
-          });
-          router.push("/login");
-          return;
-        }
+      setProfileImage(avatarUrl);
+      setFullName(contextProfile.full_name || "");
+      setEmail(contextProfile.email || "");
+      setBio(contextProfile.bio || "");
+      setEducation(contextProfile.education || "");
+      setSkills(Array.isArray(contextProfile.skills) ? contextProfile.skills : []);
+      setProjects(Array.isArray(contextProfile.projects) ? contextProfile.projects : []);
+      setUsername(contextProfile.username || "");
 
-        setUser(user);
-
-        const { data: profile, error: profileError } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("id", user.id)
-          .single();
-
-        if (profileError) throw profileError;
-
-        // Get fresh image URL with cache busting
-        const avatarUrl = profile.avatar_url 
-          ? `${profile.avatar_url}?${Date.now()}`
-          : "/placeholder.svg";
-
-        setProfileImage(avatarUrl);
-        setFullName(profile.full_name || "");
-        setEmail(profile.email || "");
-        setBio(profile.bio || "");
-        setEducation(profile.education || "");
-        setSkills(Array.isArray(profile.skills) ? profile.skills.join(", ") : "");
-        setProjects(Array.isArray(profile.projects) ? profile.projects : []);
-        setUsername(profile.username || "");
-
-        if (profile.username) setIsUsernameEditable(false);
-      } catch (error) {
-        console.error("Error fetching profile:", error);
-        toast({
-          title: "Error",
-          description: "Failed to fetch profile data.",
-          variant: "destructive",
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchProfile();
-  }, [supabase, router, refreshKey]); // Add refreshKey to dependencies
+      if (contextProfile.username) setIsUsernameEditable(false);
+    }
+  }, [contextProfile]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!user) {
+    if (!contextProfile) {
       toast({
         title: "Error",
         description: "No authenticated user found.",
@@ -103,36 +72,36 @@ export default function EditProfilePage() {
     setLoading(true);
 
     try {
-      const processedSkills = skills
-        .split(",")
-        .map((skill) => skill.trim())
-        .filter((skill) => skill.length > 0);
-
       const updatedProfile = {
-        id: user.id,
+        id: contextProfile.id,
         full_name: fullName,
         email,
         bio,
         education,
-        skills: processedSkills,
+        skills,
         projects,
-        avatar_url: profileImage.split('?')[0], // Remove cache busting parameter
+        avatar_url: profileImage.split('?')[0],
         username,
+        updated_at: new Date().toISOString(),
       };
 
-      const { error } = await supabase.from("profiles").upsert(updatedProfile);
+      const { data, error } = await supabase
+        .from("profiles")
+        .upsert(updatedProfile)
+        .select()
+        .single();
 
       if (error) throw error;
+
+      // Update context profile
+      setContextProfile(data);
 
       toast({
         title: "Success",
         description: "Profile updated successfully!",
       });
-      
-      // Force refresh of data with cache busting
-      setRefreshKey(prev => prev + 1);
-      router.refresh(); // Refresh Next.js router cache
 
+      router.push("/profile");
     } catch (error) {
       console.error("Error updating profile:", error);
       toast({
@@ -146,10 +115,9 @@ export default function EditProfilePage() {
   };
 
   const handleDeleteProfile = async () => {
-    if (!user) return;
+    if (!contextProfile) return;
 
     try {
-      // Delete avatar from storage
       if (profileImage && profileImage.startsWith('http')) {
         const filePath = profileImage.split('/').pop()?.split('?')[0];
         if (filePath) {
@@ -159,14 +127,21 @@ export default function EditProfilePage() {
         }
       }
 
-      // Delete profile from database
-      const { error } = await supabase.from("profiles").delete().eq("id", user.id);
+      const { error } = await supabase
+        .from("profiles")
+        .delete()
+        .eq("id", contextProfile.id);
+
       if (error) throw error;
+
+      // Clear context profile
+      setContextProfile(null);
 
       toast({
         title: "Success",
         description: "Profile deleted successfully!",
       });
+
       router.push("/");
     } catch (error) {
       console.error("Error deleting profile:", error);
@@ -188,11 +163,10 @@ export default function EditProfilePage() {
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-6">
               <AvatarUpload
-                uid={user?.id || ""}
+                uid={contextProfile?.id || ""}
                 url={profileImage}
                 onUpload={(newUrl) => {
-                  setProfileImage(`${newUrl}?${Date.now()}`); // Immediate update with cache bust
-                  setRefreshKey(prev => prev + 1); // Force data refresh
+                  setProfileImage(`${newUrl}?${Date.now()}`);
                 }}
                 className="mb-8"
               />
@@ -208,8 +182,16 @@ export default function EditProfilePage() {
                 username={username}
                 setUsername={setUsername}
               />
-              <SkillsInput skills={skills} setSkills={setSkills} />
-              <ProjectsSection projects={projects} setProjects={setProjects} />
+              <div className="space-y-6">
+                <div>
+                  <h3 className="text-lg font-medium mb-4">Skills</h3>
+                  <EnhancedSkillsInput skills={skills} setSkills={setSkills} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-medium mb-4">Projects</h3>
+                  <EnhancedProjectsSection projects={projects} setProjects={setProjects} />
+                </div>
+              </div>
               <div className="flex justify-between">
                 <DeleteProfileDialog
                   isDeleteDialogOpen={isDeleteDialogOpen}
